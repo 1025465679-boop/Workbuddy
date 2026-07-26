@@ -1,3 +1,8 @@
+/* ============================================================
+   WorkBuddy 手机工作台 - 核心逻辑
+   ============================================================ */
+
+// ============ 数据存储 ============
 const Store = {
   get(key, def = []) {
     try {
@@ -10,6 +15,7 @@ const Store = {
   }
 };
 
+// ============ 工具函数 ============
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -35,6 +41,7 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 1800);
 }
 
+// 语音朗读（英语口语用）
 function speak(text, lang = 'en-US', rate = 0.9) {
   if (!('speechSynthesis' in window)) {
     toast('当前浏览器不支持语音播放');
@@ -48,6 +55,7 @@ function speak(text, lang = 'en-US', rate = 0.9) {
   window.speechSynthesis.speak(u);
 }
 
+// ============ 页面配置 ============
 const PAGES = {
   daily:   { title: '每日计划',     render: renderDaily,   showFab: true  },
   log:     { title: '每日工作日志提醒', render: renderLog,     showFab: false },
@@ -58,6 +66,7 @@ const PAGES = {
 
 let currentPage = 'daily';
 
+// ============ 导航 ============
 function initNav() {
   $('#menuBtn').addEventListener('click', () => {
     $('#sidebar').classList.add('open');
@@ -94,6 +103,7 @@ function switchPage(page) {
   PAGES[page].render();
 }
 
+// ============ 1. 每日计划 ============
 function renderDaily() {
   const tasks = Store.get('tasks', []);
   const today = todayStr();
@@ -104,11 +114,21 @@ function renderDaily() {
 
   $('#content').innerHTML = `
     <div class="task-stats">
-      <div class="stat-box"><div class="stat-num">${done}</div><div class="stat-label">已完成</div></div>
-      <div class="stat-box"><div class="stat-num">${total-done}</div><div class="stat-label">待办</div></div>
-      <div class="stat-box"><div class="stat-num">${percent}%</div><div class="stat-label">完成率</div></div>
+      <div class="stat-box">
+        <div class="stat-num">${done}</div>
+        <div class="stat-label">已完成</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${total-done}</div>
+        <div class="stat-label">待办</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${percent}%</div>
+        <div class="stat-label">完成率</div>
+      </div>
     </div>
     <div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+
     <div class="card">
       <h3 class="card-title"><span class="emoji">➕</span>添加今日任务</h3>
       <div class="task-input-wrap">
@@ -116,6 +136,7 @@ function renderDaily() {
         <button class="add-btn" id="addTaskBtn">+</button>
       </div>
     </div>
+
     <div class="card">
       <h3 class="card-title"><span class="emoji">📋</span>今日任务 (${done}/${total})</h3>
       <ul class="task-list" id="taskList">
@@ -143,7 +164,13 @@ function addTask() {
   const text = input.value.trim();
   if (!text) { toast('请输入任务内容'); return; }
   const tasks = Store.get('tasks', []);
-  tasks.push({ id: 't_' + Date.now(), text, done: false, date: todayStr(), createdAt: Date.now() });
+  tasks.push({
+    id: 't_' + Date.now(),
+    text,
+    done: false,
+    date: todayStr(),
+    createdAt: Date.now()
+  });
   Store.set('tasks', tasks);
   input.value = '';
   renderDaily();
@@ -169,21 +196,33 @@ function deleteTask(id) {
   toast('已删除');
 }
 
-const DEFAULT_REMINDER_TIME = '21:00';
+// ============ 2. 每日工作日志提醒 ============
+const DEFAULT_REMINDER_TIME = '21:00'; // 默认提醒时间
 
 function renderLog() {
   const today = todayStr();
   const logs = Store.get('logs', []);
   const todayLog = logs.find(l => l.date === today);
   const content = todayLog ? todayLog.content : '';
+
+  // 连续打卡天数计算
   const streak = calcLogStreak(logs);
   const totalLogs = logs.length;
+
+  // 提醒设置
   const reminder = Store.get('log_reminder', { enabled: true, time: DEFAULT_REMINDER_TIME });
+  const lastNotified = Store.get('log_last_notified', '');
+
+  // 今日是否已写
   const writtenToday = !!todayLog && content.length > 0;
 
-  const history = logs.filter(l => l.date !== today).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
+  const history = logs
+    .filter(l => l.date !== today)
+    .sort((a,b) => b.date.localeCompare(a.date))
+    .slice(0, 10);
 
   $('#content').innerHTML = `
+    <!-- 提醒状态卡片 -->
     <div class="card ${writtenToday ? 'reminder-done' : 'reminder-pending'}">
       <div class="reminder-banner">
         <div class="reminder-icon">${writtenToday ? '✅' : '⏰'}</div>
@@ -193,29 +232,44 @@ function renderLog() {
         </div>
       </div>
     </div>
+
+    <!-- 打卡统计 -->
     <div class="task-stats">
-      <div class="stat-box"><div class="stat-num">${streak}</div><div class="stat-label">连续打卡</div></div>
-      <div class="stat-box"><div class="stat-num">${totalLogs}</div><div class="stat-label">累计日志</div></div>
-      <div class="stat-box"><div class="stat-num">${writtenToday ? '1' : '0'}</div><div class="stat-label">今日</div></div>
+      <div class="stat-box">
+        <div class="stat-num">${streak}</div>
+        <div class="stat-label">连续打卡</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${totalLogs}</div>
+        <div class="stat-label">累计日志</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${writtenToday ? '1' : '0'}</div>
+        <div class="stat-label">今日</div>
+      </div>
     </div>
+
+    <!-- 一键打开 DeepSeek -->
     <div class="card deepseek-card">
       <div class="deepseek-banner">
         <div class="deepseek-logo">🤖</div>
         <div class="deepseek-info">
           <div class="deepseek-title">打开 DeepSeek 写日志</div>
-          <div class="deepseek-subtitle">点击一键跳转到 DeepSeek 写工作日志</div>
+          <div class="deepseek-subtitle">点击一键跳转到 DeepSeek APP 写工作日志</div>
         </div>
         <button class="deepseek-btn" id="openDeepSeekBtn">前往<br>DeepSeek</button>
       </div>
       <div class="deepseek-setting">
         <button class="deepseek-toggle" id="deepseekSettingToggle">⚙️ 自定义跳转地址</button>
         <div class="deepseek-setting-panel" id="deepseekSettingPanel" style="display:none;">
-          <input type="text" id="deepseekUrl" class="time-input" value="${Store.get('deepseek_url', 'https://chat.deepseek.com/share/rvqstjfc3ypjkcgy2i')}" />
-          <div class="reminder-hint">点击按钮会直接跳转到 DeepSeek 网页版</div>
+          <input type="text" id="deepseekUrl" class="time-input" placeholder="DeepSeek 链接" value="${Store.get('deepseek_url', 'https://chat.deepseek.com/share/rvqstjfc3ypjkcgy2i')}" />
+          <div class="reminder-hint">点击按钮会直接跳转到 DeepSeek 网页版，如已装 APP 会提示打开</div>
           <button class="log-save-btn ghost-btn" id="saveDeepSeekUrl" style="margin-top:8px;">保存地址</button>
         </div>
       </div>
     </div>
+
+    <!-- 提醒设置 -->
     <div class="card">
       <h3 class="card-title"><span class="emoji">🔔</span>每日提醒设置</h3>
       <div class="reminder-setting">
@@ -223,7 +277,7 @@ function renderLog() {
           <span>开启每日提醒</span>
           <span class="switch ${reminder.enabled ? 'on' : ''}" id="reminderSwitch"></span>
         </label>
-        <div class="time-setting" style="${reminder.enabled ? '' : 'opacity:0.4;pointer-events:none;'}">
+        <div class="time-setting" id="timeSetting" style="${reminder.enabled ? '' : 'opacity:0.4;pointer-events:none;'}">
           <label class="time-label">⏰ 提醒时间</label>
           <input type="time" id="reminderTime" class="time-input" value="${reminder.time}" />
           <div class="reminder-hint">每天 ${reminder.time} 若未写日志，将自动弹出提醒</div>
@@ -231,106 +285,208 @@ function renderLog() {
         <button class="log-save-btn ghost-btn" id="testReminderBtn">🔔 测试提醒</button>
       </div>
     </div>
+
+    <!-- 日志编辑 -->
     <div class="card">
       <h3 class="card-title"><span class="emoji">📝</span>今日工作日志 · ${today}</h3>
-      <textarea id="logArea" class="log-textarea" placeholder="今天做了什么？遇到什么问题？有什么收获？
-
-建议结构：
-1. 今日完成事项
-2. 进行中事项
-3. 遇到的问题
-4. 明日计划"></textarea>
+      <textarea id="logArea" class="log-textarea" placeholder="今天做了什么？遇到什么问题？有什么收获？&#10;&#10;建议结构：&#10;1. 今日完成事项&#10;2. 进行中事项&#10;3. 遇到的问题&#10;4. 明日计划"></textarea>
       <button class="log-save-btn" id="logSaveBtn">💾 保存日志</button>
     </div>
+
+    <!-- 历史日志 -->
     <div class="card">
       <h3 class="card-title"><span class="emoji">📚</span>历史日志</h3>
       ${history.length === 0
         ? '<div class="empty-tip"><span class="emoji">📖</span>暂无历史日志</div>'
-        : history.map(l => `<div class="log-history-item"><div class="log-history-date">📅 ${l.date}</div><div class="log-history-content">${escapeHtml(l.content)}</div></div>`).join('')
+        : history.map(l => `
+          <div class="log-history-item">
+            <div class="log-history-date">📅 ${l.date}</div>
+            <div class="log-history-content">${escapeHtml(l.content)}</div>
+          </div>
+        `).join('')
       }
     </div>
   `;
 
   $('#logArea').value = content;
   $('#logSaveBtn').addEventListener('click', saveLog);
+
+  // 打开 DeepSeek
   $('#openDeepSeekBtn').addEventListener('click', openDeepSeek);
+
+  // 展开自定义地址设置
   $('#deepseekSettingToggle').addEventListener('click', () => {
     const panel = $('#deepseekSettingPanel');
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   });
+
+  // 保存自定义地址
   $('#saveDeepSeekUrl').addEventListener('click', () => {
     const url = $('#deepseekUrl').value.trim();
-    Store.set('deepseek_url', url || 'https://chat.deepseek.com/share/rvqstjfc3ypjkcgy2i');
+    Store.set('deepseek_url', url || 'deepseek://');
     toast('跳转地址已保存');
     $('#deepseekSettingPanel').style.display = 'none';
   });
+
+  // 提醒开关
   $('#reminderSwitch').addEventListener('click', () => {
     reminder.enabled = !reminder.enabled;
     Store.set('log_reminder', reminder);
     renderLog();
     toast(reminder.enabled ? '提醒已开启 🔔' : '提醒已关闭');
   });
+
+  // 时间修改
   $('#reminderTime').addEventListener('change', (e) => {
     reminder.time = e.target.value;
     Store.set('log_reminder', reminder);
-    Store.set('log_last_notified', '');
+    Store.set('log_last_notified', ''); // 重置通知状态
     toast('提醒时间已设为 ' + reminder.time);
   });
-  $('#testReminderBtn').addEventListener('click', () => { showLogReminder(true); });
+
+  // 测试提醒
+  $('#testReminderBtn').addEventListener('click', () => {
+    showLogReminder(true);
+  });
 }
 
+// 打开学习通 APP
+function openChaoxing() {
+  const url = Store.get('chaoxing_url', 'chaoxing://');
+  toast('正在唤醒学习通 APP...');
+  // 通过隐藏 iframe 尝试唤起 APP（兼容 iOS Safari 和安卓）
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    // 1.5 秒后移除 iframe，并检测是否唤起成功
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      // 如果用户还在当前页面，说明未成功唤起，提示手动打开
+      if (!document.hidden) {
+        showChaoxingFallback(url);
+      }
+    }, 1500);
+  } catch (e) {
+    // 直接 location 跳转兜底
+    window.location.href = url;
+    setTimeout(() => {
+      if (!document.hidden) showChaoxingFallback(url);
+    }, 1500);
+  }
+}
+
+// 唤起失败的提示弹窗
+function showChaoxingFallback(url) {
+  const old = $('#chaoxingFallback');
+  if (old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'chaoxingFallback';
+  modal.className = 'reminder-modal';
+  modal.innerHTML = `
+    <div class="reminder-modal-mask"></div>
+    <div class="reminder-modal-box">
+      <div class="reminder-modal-icon">📱</div>
+      <div class="reminder-modal-title">未能自动打开学习通</div>
+      <div class="reminder-modal-text">可能是手机里尚未安装学习通，或浏览器拦截了跳转。<br>请手动打开学习通 APP，或检查下方地址是否正确。</div>
+      <div class="chaoxing-fallback-url">当前地址：<code>${escapeHtml(url)}</code></div>
+      <div class="reminder-modal-actions">
+        <button class="reminder-btn-primary" id="chaoxingRetryBtn">🔁 重新尝试</button>
+        <button class="reminder-btn-ghost" id="chaoxingCloseBtn">关闭</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  $('#chaoxingRetryBtn').addEventListener('click', () => {
+    modal.remove();
+    openChaoxing();
+  });
+  $('#chaoxingCloseBtn').addEventListener('click', () => modal.remove());
+}
+
+// 打开 DeepSeek APP
+function openDeepSeek() {
+  const url = Store.get('deepseek_url', 'https://chat.deepseek.com/share/rvqstjfc3ypjkcgy2i');
+  toast('正在打开 DeepSeek...');
+  // 直接用 location 跳转（网页链接兼容性最好）
+  window.location.href = url;
+}
+
+// 计算连续打卡天数
 function calcLogStreak(logs) {
   if (!logs.length) return 0;
   const dates = new Set(logs.map(l => l.date));
   let streak = 0;
   const d = new Date();
+  // 如果今天没写，从昨天开始算
   const today = todayStr();
-  if (!dates.has(today)) d.setDate(d.getDate() - 1);
+  if (!dates.has(today)) {
+    d.setDate(d.getDate() - 1);
+  }
   while (true) {
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if (dates.has(ds)) { streak++; d.setDate(d.getDate() - 1); } else break;
+    if (dates.has(ds)) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
   }
   return streak;
 }
 
+// 保存日志
 function saveLog() {
   const content = $('#logArea').value.trim();
   if (!content) { toast('日志内容不能为空'); return; }
   const today = todayStr();
   const logs = Store.get('logs', []);
   const idx = logs.findIndex(l => l.date === today);
-  if (idx >= 0) { logs[idx].content = content; logs[idx].updatedAt = Date.now(); }
-  else { logs.push({ id: 'l_' + Date.now(), date: today, content, createdAt: Date.now() }); }
+  if (idx >= 0) {
+    logs[idx].content = content;
+    logs[idx].updatedAt = Date.now();
+  } else {
+    logs.push({ id: 'l_' + Date.now(), date: today, content, createdAt: Date.now() });
+  }
   Store.set('logs', logs);
   toast('日志已保存，打卡成功！🎉');
-  renderLog();
+  renderLog(); // 刷新统计
 }
 
-function openDeepSeek() {
-  const url = Store.get('deepseek_url', 'https://chat.deepseek.com/share/rvqstjfc3ypjkcgy2i');
-  toast('正在打开 DeepSeek...');
-  window.location.href = url;
-}
-
+// ============ 日志提醒系统 ============
 function showLogReminder(isTest = false) {
   const today = todayStr();
   const logs = Store.get('logs', []);
   const todayLog = logs.find(l => l.date === today);
+
+  // 已写则不提醒（测试模式除外）
   if (!isTest && todayLog && todayLog.content.trim()) return;
+
   const reminder = Store.get('log_reminder', { enabled: true, time: DEFAULT_REMINDER_TIME });
   if (!isTest && !reminder.enabled) return;
+
+  // 同一天只提醒一次（测试模式除外）
   if (!isTest) {
     const lastNotified = Store.get('log_last_notified', '');
     if (lastNotified === today) return;
     Store.set('log_last_notified', today);
   }
-  const msg = isTest ? '🔔 测试提醒：该写今日工作日志了！' : `⏰ ${reminder.time} 提醒：今天还没写工作日志，花 5 分钟记录一下吧！`;
+
+  // 弹出确认框
+  const msg = isTest
+    ? '🔔 测试提醒：该写今日工作日志了！'
+    : `⏰ ${reminder.time} 提醒：今天还没写工作日志，花 5 分钟记录一下吧！`;
+
   showReminderModal(msg);
 }
 
+// 提醒弹窗
 function showReminderModal(msg) {
+  // 移除已存在的
   const old = $('#reminderModal');
   if (old) old.remove();
+
   const modal = document.createElement('div');
   modal.id = 'reminderModal';
   modal.className = 'reminder-modal';
@@ -347,38 +503,63 @@ function showReminderModal(msg) {
     </div>
   `;
   document.body.appendChild(modal);
-  $('#reminderGoBtn').addEventListener('click', () => { modal.remove(); openDeepSeek(); });
+
+  // "立即去写" → 跳转到 DeepSeek APP
+  $('#reminderGoBtn').addEventListener('click', () => {
+    modal.remove();
+    openDeepSeek();
+  });
   $('#reminderLaterBtn').addEventListener('click', () => {
     modal.remove();
+    // 10 分钟后再提醒
     setTimeout(() => showLogReminder(true), 10 * 60 * 1000);
   });
 }
 
+// 定时检查提醒
 function startReminderChecker() {
-  setInterval(() => { checkReminder(); }, 60 * 1000);
+  // 每 60 秒检查一次
+  setInterval(() => {
+    checkReminder();
+  }, 60 * 1000);
+  // 启动时立即检查一次
   setTimeout(checkReminder, 2000);
 }
 
 function checkReminder() {
   const reminder = Store.get('log_reminder', { enabled: true, time: DEFAULT_REMINDER_TIME });
   if (!reminder.enabled) return;
+
   const now = new Date();
   const hh = String(now.getHours()).padStart(2,'0');
   const mm = String(now.getMinutes()).padStart(2,'0');
   const nowTime = `${hh}:${mm}`;
-  if (nowTime >= reminder.time) showLogReminder(false);
+
+  // 到达提醒时间或超过提醒时间（同一天内未通知过）
+  if (nowTime >= reminder.time) {
+    showLogReminder(false);
+  }
 }
 
+// ============ 3. 旅游助手 ============
 function renderTravel() {
   const plans = Store.get('travel', []).sort((a,b) => b.createdAt - a.createdAt);
+
   $('#content').innerHTML = `
     <div class="card">
       <h3 class="card-title"><span class="emoji">✈️</span>添加旅行计划</h3>
-      <div class="travel-input-group"><input type="text" id="travelInput" class="travel-input" placeholder="目的地，如：日本京都" /></div>
-      <div class="travel-input-group"><input type="date" id="travelDate" class="travel-input" /></div>
-      <div class="travel-input-group"><input type="text" id="travelNote" class="travel-input" placeholder="备注：必去景点/预算/天数等" /></div>
+      <div class="travel-input-group">
+        <input type="text" id="travelInput" class="travel-input" placeholder="目的地，如：日本京都" />
+      </div>
+      <div class="travel-input-group">
+        <input type="date" id="travelDate" class="travel-input" />
+      </div>
+      <div class="travel-input-group">
+        <input type="text" id="travelNote" class="travel-input" placeholder="备注：必去景点/预算/天数等" />
+      </div>
       <button class="log-save-btn" id="travelAddBtn">📌 添加计划</button>
     </div>
+
     <div class="card">
       <h3 class="card-title"><span class="emoji">🗺️</span>我的旅行清单</h3>
       ${plans.length === 0
@@ -398,13 +579,19 @@ function renderTravel() {
         `).join('')
       }
     </div>
+
     <div class="card">
       <h3 class="card-title"><span class="emoji">💡</span>旅行小贴士</h3>
       <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
-        • 提前 1 个月订机票酒店更便宜<br>• 重要证件拍照存云端备用<br>• 下载离线地图应对无网络<br>• 兑换少量当地货币应急<br>• 购买旅行保险更安心
+        • 提前 1 个月订机票酒店更便宜<br>
+        • 重要证件拍照存云端备用<br>
+        • 下载离线地图应对无网络<br>
+        • 兑换少量当地货币应急<br>
+        • 购买旅行保险更安心
       </div>
     </div>
   `;
+
   $('#travelAddBtn').addEventListener('click', addTravel);
 }
 
@@ -412,7 +599,14 @@ function addTravel() {
   const dest = $('#travelInput').value.trim();
   if (!dest) { toast('请输入目的地'); return; }
   const plans = Store.get('travel', []);
-  plans.push({ id: 'tr_' + Date.now(), dest, date: $('#travelDate').value, note: $('#travelNote').value.trim(), done: false, createdAt: Date.now() });
+  plans.push({
+    id: 'tr_' + Date.now(),
+    dest,
+    date: $('#travelDate').value,
+    note: $('#travelNote').value.trim(),
+    done: false,
+    createdAt: Date.now()
+  });
   Store.set('travel', plans);
   renderTravel();
   toast('旅行计划已添加 🗺️');
@@ -421,7 +615,11 @@ function addTravel() {
 function toggleTravelDone(id) {
   const plans = Store.get('travel', []);
   const p = plans.find(x => x.id === id);
-  if (p) { p.done = !p.done; Store.set('travel', plans); renderTravel(); }
+  if (p) {
+    p.done = !p.done;
+    Store.set('travel', plans);
+    renderTravel();
+  }
 }
 
 function deleteTravel(id) {
@@ -432,6 +630,7 @@ function deleteTravel(id) {
   toast('已删除');
 }
 
+// ============ 4. 每日/周复盘 ============
 let reviewMode = 'daily';
 
 function renderReview() {
@@ -446,6 +645,7 @@ function renderReview() {
       <button class="review-tab ${reviewMode==='daily'?'active':''}" onclick="switchReview('daily')">📅 每日复盘</button>
       <button class="review-tab ${reviewMode==='weekly'?'active':''}" onclick="switchReview('weekly')">📆 每周复盘</button>
     </div>
+
     <div class="card">
       <h3 class="card-title"><span class="emoji">🔄</span>${reviewMode==='daily'?'今日':'本周'}复盘 · ${today}</h3>
       ${questions.map((q, i) => `
@@ -456,6 +656,7 @@ function renderReview() {
       `).join('')}
       <button class="log-save-btn" id="reviewSaveBtn">💾 保存复盘</button>
     </div>
+
     <div class="card">
       <h3 class="card-title"><span class="emoji">📖</span>历史复盘</h3>
       ${saved.filter(r => r.date !== today).length === 0
@@ -469,10 +670,14 @@ function renderReview() {
       }
     </div>
   `;
+
   $('#reviewSaveBtn').addEventListener('click', saveReview);
 }
 
-function switchReview(mode) { reviewMode = mode; renderReview(); }
+function switchReview(mode) {
+  reviewMode = mode;
+  renderReview();
+}
 
 function saveReview() {
   const today = todayStr();
@@ -480,10 +685,15 @@ function saveReview() {
   const saved = Store.get(key, []);
   const answers = [];
   $$('.review-q-input').forEach((el, i) => { answers[i] = el.value.trim(); });
+
   if (answers.every(a => !a)) { toast('请至少填写一项'); return; }
+
   const idx = saved.findIndex(r => r.date === today);
-  if (idx >= 0) saved[idx].answers = answers;
-  else saved.push({ id: 'r_' + Date.now(), date: today, answers });
+  if (idx >= 0) {
+    saved[idx].answers = answers;
+  } else {
+    saved.push({ id: 'r_' + Date.now(), date: today, answers });
+  }
   Store.set(key, saved);
   toast('复盘已保存 💾');
 }
@@ -504,6 +714,7 @@ const WEEKLY_REVIEW_QUESTIONS = [
   { icon: '🚀', title: '下周重点计划？', placeholder: '下周要聚焦的事情...' },
 ];
 
+// ============ 5. 英语口语学习 ============
 let engMode = 'listen';
 
 function renderEnglish() {
@@ -520,19 +731,24 @@ function renderEnglish() {
 
 function switchEng(mode) {
   engMode = mode;
-  $$('.eng-tab').forEach(b => b.classList.remove('active'));
-  const idx = mode === 'listen' ? 0 : mode === 'speak' ? 1 : 2;
-  $$('.eng-tab')[idx].classList.add('active');
+  $$('.eng-tab').forEach(b => b.classList.toggle('active', b.textContent.includes(mode==='listen'?'听力':mode==='speak'?'口语':'阅读')));
   renderEngContent();
 }
 
 function renderEngContent() {
-  const data = engMode === 'listen' ? LISTENING_LESSONS : engMode === 'speak' ? SPEAKING_LESSONS : READING_LESSONS;
+  const data = engMode === 'listen' ? LISTENING_LESSONS
+             : engMode === 'speak'  ? SPEAKING_LESSONS
+             : READING_LESSONS;
   const container = $('#engContent');
+
   container.innerHTML = `
     <div class="card" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${engMode==='listen'?'👂 听力训练':engMode==='speak'?'🗣️ 口语训练':'📖 阅读训练'}</div>
-      <div style="font-size:12px;opacity:0.9;line-height:1.5;">${engMode==='listen'?'先听不看字幕，听不懂再看原文，跟读模仿语调。':engMode==='speak'?'大声朗读，注意连读和重音，反复练习直到流畅。':'先通读理解大意，再细读查生词，最后复述内容。'}</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;">
+        ${engMode==='listen'?'👂 听力训练':engMode==='speak'?'🗣️ 口语训练':'📖 阅读训练'}
+      </div>
+      <div style="font-size:12px;opacity:0.9;line-height:1.5;">
+        ${engMode==='listen'?'先听不看字幕，听不懂再看原文，跟读模仿语调。':engMode==='speak'?'大声朗读，注意连读和重音，反复练习直到流畅。':'先通读理解大意，再细读查生词，最后复述内容。'}
+      </div>
     </div>
     ${data.map((lesson, i) => `
       <div class="eng-lesson">
@@ -550,87 +766,327 @@ function renderEngContent() {
         `).join('')}
       </div>
     `).join('')}
-    <div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:12px;">每天坚持 15 分钟，30 天看到明显进步 💪</div>
+    <div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:12px;">
+      每天坚持 15 分钟，30 天看到明显进步 💪
+    </div>
   `;
 }
 
+/* ============================================================
+   英语口语学习内容
+   ============================================================ */
+
+// ============ 听力训练 ============
 const LISTENING_LESSONS = [
-  { title: '日常问候', level: 'easy', levelText: '入门', sentences: [
-    { en: "How's it going?", zh: "最近怎么样？", key: "<b>How's it going?</b> 是比 How are you? 更口语化的问候。", tip: "going 的 g 弱读" },
-    { en: "What have you been up to?", zh: "你最近在忙什么？", key: "<b>be up to</b> 表示「正在做某事」。", tip: "连读 what-have-you 听起来像 'whachya'" },
-    { en: "Long time no see! How have you been?", zh: "好久不见！你过得怎么样？", key: "<b>Long time no see</b> 已广泛使用的地道表达。", tip: "注意 How have you been 问一段时间" },
-    { en: "It's been a while. What's new?", zh: "好久不见了。有什么新鲜事？", key: "<b>What's new?</b> 询问对方最近动态。", tip: "连读成 'Wha-s-new'" }
-  ]},
-  { title: '餐厅点餐', level: 'mid', levelText: '进阶', sentences: [
-    { en: "I'd like to make a reservation for two.", zh: "我想预订两人位。", key: "<b>I'd like to</b> 礼貌请求句型。", tip: "连读成 'I-like-ta'" },
-    { en: "Could I see the menu, please?", zh: "请给我看一下菜单好吗？", key: "<b>Could I...</b> 委婉请求句型。", tip: "比 Can I 更礼貌" },
-    { en: "What do you recommend?", zh: "你有什么推荐的？", key: "<b>recommend</b> 推荐。", tip: "重音在第二音节" },
-    { en: "I'll have the steak, medium rare please.", zh: "我要一份牛排，三分熟。", key: "<b>medium rare</b> 三分熟，<b>well done</b> 全熟。", tip: "rare → medium rare → medium → well done" },
-    { en: "Check, please.", zh: "买单。", key: "<b>Check, please</b> 美式用法。", tip: "简化表达" }
-  ]},
-  { title: '职场沟通', level: 'hard', levelText: '高级', sentences: [
-    { en: "Let's circle back to this after the meeting.", zh: "我们会后回头再讨论。", key: "<b>circle back</b> 稍后再回到某话题。", tip: "职场高频短语" },
-    { en: "I think we're on the same page.", zh: "我认为我们达成共识了。", key: "<b>on the same page</b> 意见一致。", tip: "确认双方理解一致" },
-    { en: "Could you walk me through the proposal?", zh: "你能给我讲解一下这个方案吗？", key: "<b>walk someone through</b> 逐步讲解。", tip: "比 explain 更形象" },
-    { en: "Let's table this for now and revisit it next week.", zh: "我们暂时搁置，下周再讨论。", key: "<b>table</b> 暂缓；<b>revisit</b> 重新讨论。", tip: "美式 table=搁置" }
-  ]}
+  {
+    title: '日常问候',
+    level: 'easy', levelText: '入门',
+    sentences: [
+      {
+        en: "How's it going?",
+        zh: "最近怎么样？",
+        key: "<b>How's it going?</b> 是比 How are you? 更口语化的问候，用于熟人之间。",
+        tip: "going 的 g 弱读，听起来像 'How's it go-in'"
+      },
+      {
+        en: "What have you been up to?",
+        zh: "你最近在忙什么？",
+        key: "<b>be up to</b> 表示「正在做某事」，常用来询问近况。",
+        tip: "连读 what-have-you 听起来像 'whachya'"
+      },
+      {
+        en: "Long time no see! How have you been?",
+        zh: "好久不见！你过得怎么样？",
+        key: "<b>Long time no see</b> 是中式英语演化成的地道表达，已广泛使用。",
+        tip: "注意 How have you been 和 How are you 的区别：前者问一段时间"
+      },
+      {
+        en: "It's been a while. What's new?",
+        zh: "好久不见了。有什么新鲜事？",
+        key: "<b>What's new?</b> 用于询问对方最近有没有什么新动态。",
+        tip: "What's new 连读成 'Wha-s-new'"
+      }
+    ]
+  },
+  {
+    title: '餐厅点餐',
+    level: 'mid', levelText: '进阶',
+    sentences: [
+      {
+        en: "I'd like to make a reservation for two.",
+        zh: "我想预订两人位。",
+        key: "<b>I'd like to</b> 是礼貌请求的句型，比 I want 更得体。<b>reservation</b> 预约。",
+        tip: "I'd like to 连读成 'I-like-ta'"
+      },
+      {
+        en: "Could I see the menu, please?",
+        zh: "请给我看一下菜单好吗？",
+        key: "<b>Could I...</b> 是委婉请求句型，比 Can I 更礼貌。",
+        tip: "Could I 和 Can I 的区别：前者更正式"
+      },
+      {
+        en: "What do you recommend?",
+        zh: "你有什么推荐的？",
+        key: "<b>recommend</b> 推荐，常用于询问对方建议。",
+        tip: "注意 recommend 的重音在第二音节"
+      },
+      {
+        en: "I'll have the steak, medium rare please.",
+        zh: "我要一份牛排，三分熟。",
+        key: "<b>I'll have...</b> 点餐常用句型。<b>medium rare</b> 三分熟，<b>medium</b> 五分熟，<b>well done</b> 全熟。",
+        tip: "牛排熟度从低到高：rare → medium rare → medium → medium well → well done"
+      },
+      {
+        en: "Check, please. / Can I get the bill?",
+        zh: "买单。/ 可以给我账单吗？",
+        key: "<b>Check, please</b> 美式用法；<b>bill</b> 英式用法。",
+        tip: "简化表达，餐厅常用"
+      }
+    ]
+  },
+  {
+    title: '职场沟通',
+    level: 'hard', levelText: '高级',
+    sentences: [
+      {
+        en: "Let's circle back to this after the meeting.",
+        zh: "我们会后回头再讨论这个。",
+        key: "<b>circle back</b> 职场高频短语，表示「稍后再回到某话题」。",
+        tip: "职场黑话，体现专业度"
+      },
+      {
+        en: "I think we're on the same page.",
+        zh: "我认为我们达成共识了。",
+        key: "<b>on the same page</b> 表示「意见一致、达成共识」。",
+        tip: "常用于确认双方理解一致"
+      },
+      {
+        en: "Could you walk me through the proposal?",
+        zh: "你能给我讲解一下这个方案吗？",
+        key: "<b>walk someone through</b> 表示「逐步讲解给某人听」。",
+        tip: "比 explain 更形象，强调一步步讲"
+      },
+      {
+        en: "Let's table this for now and revisit it next week.",
+        zh: "我们暂时搁置，下周再讨论。",
+        key: "<b>table</b> 作动词表示「暂缓、搁置'；<b>revisit</b> 重新讨论。",
+        tip: "美式 table=搁置；英式 table=提出讨论，意思相反！"
+      }
+    ]
+  }
 ];
 
+// ============ 口语训练 ============
 const SPEAKING_LESSONS = [
-  { title: '自我介绍', level: 'easy', levelText: '入门', sentences: [
-    { en: "Hi, I'm [name]. Nice to meet you!", zh: "嗨，我是[名字]。很高兴认识你！", key: "<b>Nice to meet you</b> 初次见面标准问候。", tip: "面带微笑，语气热情" },
-    { en: "I'm from [city]. I work as a [job].", zh: "我来自[城市]，我的职业是[工作]。", key: "<b>work as</b> 担任...工作。", tip: "比 I'm a 更自然" },
-    { en: "In my free time, I enjoy reading and traveling.", zh: "业余时间我喜欢阅读和旅行。", key: "<b>enjoy doing</b> 喜欢做某事。", tip: "enjoy 后接动名词" },
-    { en: "I'm passionate about photography and learning new things.", zh: "我对摄影和学习新事物充满热情。", key: "<b>be passionate about</b> 对...有热情。", tip: "高级表达" }
-  ]},
-  { title: '表达观点', level: 'mid', levelText: '进阶', sentences: [
-    { en: "In my opinion, we should focus on quality over quantity.", zh: "在我看来，我们应该重质量胜过数量。", key: "<b>quality over quantity</b> 质量优先。", tip: "标准开场" },
-    { en: "I see what you mean, but I have a different take on this.", zh: "我明白你的意思，但我有不同的看法。", key: "<b>take</b> 名词，看法。", tip: "委婉表达不同意见" },
-    { en: "That's a good point. However, we also need to consider the cost.", zh: "说得有道理。不过我们也要考虑成本。", key: "<b>However</b> 转折。", tip: "先肯定后转折" },
-    { en: "I'm of the opinion that we should take a different approach.", zh: "我认为我们应该采取不同的方法。", key: "<b>be of the opinion that</b> 较正式。", tip: "适合商务场合" }
-  ]},
-  { title: '日常对话', level: 'mid', levelText: '进阶', sentences: [
-    { en: "Sounds like a plan! Let's do it.", zh: "听起来不错！就这么办。", key: "<b>Sounds like a plan</b> 同意。", tip: "日常高频" },
-    { en: "To be honest, I'm not really sure about that.", zh: "说实话，我不太确定。", key: "<b>To be honest</b> 诚实说。", tip: "委婉表达不确定" },
-    { en: "It depends. Let me think about it and get back to you.", zh: "看情况。让我想想再回复你。", key: "<b>get back to you</b> 回头答复。", tip: "不立刻决定的标准回答" },
-    { en: "No worries! I totally get it.", zh: "没关系！我完全理解。", key: "<b>No worries</b> 没关系。", tip: "轻松场合万能句" }
-  ]},
-  { title: '商务谈判', level: 'hard', levelText: '高级', sentences: [
-    { en: "We're willing to negotiate, but we have our limits.", zh: "我们愿意协商，但有底线。", key: "<b>have our limits</b> 有底线。", tip: "表明立场" },
-    { en: "Let's find a middle ground that works for both of us.", zh: "我们找个双方都能接受的折中方案。", key: "<b>middle ground</b> 折中方案。", tip: "促成双赢" },
-    { en: "I appreciate your offer, but it's a bit beyond our budget.", zh: "感谢你的报价，但有点超出预算。", key: "<b>beyond our budget</b> 超出预算。", tip: "委婉拒绝" },
-    { en: "Can we sleep on it and give you an answer tomorrow?", zh: "我们能考虑一晚，明天给你答复吗？", key: "<b>sleep on it</b> 考虑一晚。", tip: "争取思考时间" }
-  ]}
+  {
+    title: '自我介绍',
+    level: 'easy', levelText: '入门',
+    sentences: [
+      {
+        en: "Hi, I'm [name]. Nice to meet you!",
+        zh: "嗨，我是[名字]。很高兴认识你！",
+        key: "<b>Nice to meet you</b> 是初次见面的标准问候，to 弱读。",
+        tip: "说的时候面带微笑，语气要热情"
+      },
+      {
+        en: "I'm from [city]. I work as a [job].",
+        zh: "我来自[城市]，我的职业是[工作]。",
+        key: "<b>work as</b> 后接职业，表示「担任...工作」。",
+        tip: "介绍职业时用 work as 比单纯说 I'm a 更自然"
+      },
+      {
+        en: "In my free time, I enjoy reading and traveling.",
+        zh: "业余时间我喜欢阅读和旅行。",
+        key: "<b>In my free time</b> 引出爱好，<b>enjoy doing</b> 喜欢做某事。",
+        tip: "enjoy 后接动名词 doing，不能接 to do"
+      },
+      {
+        en: "I'm passionate about photography and learning new things.",
+        zh: "我对摄影和学习新事物充满热情。",
+        key: "<b>be passionate about</b> 对...有热情，比 like 更强烈。",
+        tip: "高级表达，体现个性"
+      }
+    ]
+  },
+  {
+    title: '表达观点',
+    level: 'mid', levelText: '进阶',
+    sentences: [
+      {
+        en: "In my opinion, we should focus on quality over quantity.",
+        zh: "在我看来，我们应该重质量胜过数量。",
+        key: "<b>In my opinion</b> 引出观点；<b>quality over quantity</b> 质量优先于数量。",
+        tip: "表达观点的标准开场"
+      },
+      {
+        en: "I see what you mean, but I have a different take on this.",
+        zh: "我明白你的意思，但我有不同的看法。",
+        key: "<b>I see what you mean</b> 表示理解对方；<b>take</b> 名词，表示「看法、观点」。",
+        tip: "委婉表达不同意见的黄金句型"
+      },
+      {
+        en: "That's a good point. However, we also need to consider the cost.",
+        zh: "说得有道理。不过我们也要考虑成本。",
+        key: "<b>That's a good point</b> 肯定对方观点；<b>However</b> 转折。",
+        tip: "先肯定后转折，沟通更顺畅"
+      },
+      {
+        en: "I'm of the opinion that we should take a different approach.",
+        zh: "我认为我们应该采取不同的方法。",
+        key: "<b>be of the opinion that</b> 较正式的「我认为」表达。",
+        tip: "比 I think 更正式，适合商务场合"
+      }
+    ]
+  },
+  {
+    title: '日常对话',
+    level: 'mid', levelText: '进阶',
+    sentences: [
+      {
+        en: "Sounds like a plan! Let's do it.",
+        zh: "听起来不错！就这么办。",
+        key: "<b>Sounds like a plan</b> 口语中表示「同意、就这么定」。",
+        tip: "非常地道，日常对话高频"
+      },
+      {
+        en: "To be honest, I'm not really sure about that.",
+        zh: "说实话，我不太确定。",
+        key: "<b>To be honest</b> 诚实说，引出真实想法；<b>not really sure</b> 不太确定。",
+        tip: "委婉表达不确定"
+      },
+      {
+        en: "It depends. Let me think about it and get back to you.",
+        zh: "看情况。让我想想再回复你。",
+        key: "<b>It depends</b> 看情况；<b>get back to you</b> 回头答复你。",
+        tip: "不立刻决定时的标准回答"
+      },
+      {
+        en: "No worries! I totally get it.",
+        zh: "没关系！我完全理解。",
+        key: "<b>No worries</b> 没关系/别担心；<b>I get it</b> 我明白了。",
+        tip: "澳式/美式都常用，轻松场合万能句"
+      }
+    ]
+  },
+  {
+    title: '商务谈判',
+    level: 'hard', levelText: '高级',
+    sentences: [
+      {
+        en: "We're willing to negotiate, but we have our limits.",
+        zh: "我们愿意协商，但有底线。",
+        key: "<b>willing to</b> 愿意；<b>have our limits</b> 有底线/限度。",
+        tip: "谈判中表明立场"
+      },
+      {
+        en: "Let's find a middle ground that works for both of us.",
+        zh: "我们找个双方都能接受的折中方案。",
+        key: "<b>middle ground</b> 中间地带、折中方案。",
+        tip: "促成双赢的黄金表达"
+      },
+      {
+        en: "I appreciate your offer, but it's a bit beyond our budget.",
+        zh: "感谢你的报价，但有点超出我们预算。",
+        key: "<b>appreciate</b> 感谢；<b>beyond our budget</b> 超出预算。",
+        tip: "委婉拒绝的商务句型"
+      },
+      {
+        en: "Can we sleep on it and give you an answer tomorrow?",
+        zh: "我们能考虑一晚，明天给你答复吗？",
+        key: "<b>sleep on it</b> 考虑一晚再做决定。",
+        tip: "争取思考时间的高级表达"
+      }
+    ]
+  }
 ];
 
+// ============ 阅读训练 ============
 const READING_LESSONS = [
-  { title: '短篇故事', level: 'easy', levelText: '入门', sentences: [
-    { en: "Every morning, Emma walks to the park near her house. She loves the fresh air and the singing of birds.", zh: "每天早上，艾玛走到家附近的公园。她喜欢新鲜空气和鸟儿的歌声。", key: "<b>singing of birds</b> 鸟鸣。", tip: "通读理解 → 跟读 → 复述" },
-    { en: "The old man sat on the bench, watching children play. He smiled, remembering his own childhood.", zh: "老人坐在长椅上，看着孩子们玩耍。他微笑着，回忆起自己的童年。", key: "<b>remembering</b> 现在分词作伴随状语。", tip: "注意时态连贯" }
-  ]},
-  { title: '新闻片段', level: 'mid', levelText: '进阶', sentences: [
-    { en: "A recent study shows that people who read regularly tend to have better memory and sharper thinking skills as they age.", zh: "最近一项研究表明，经常阅读的人随着年龄增长，往往有更好的记忆力和更敏锐的思维。", key: "<b>tend to</b> 倾向于；<b>as they age</b> 随年龄增长。", tip: "先抓主干：study shows that..." },
-    { en: "The company announced a new policy allowing employees to work remotely up to three days a week.", zh: "公司宣布了一项新政策，允许员工每周最多远程工作三天。", key: "<b>allowing</b> 现在分词修饰 policy。", tip: "长句拆分理解" }
-  ]},
-  { title: 'TED 演讲节选', level: 'hard', levelText: '高级', sentences: [
-    { en: "Success is not final, failure is not fatal: it is the courage to continue that counts.", zh: "成功不是终点，失败也不是末日：重要的是继续前行的勇气。", key: "<b>it is...that counts</b> 强调句型。", tip: "注意强调结构" },
-    { en: "The greatest discovery of my generation is that human beings can alter their lives by altering their attitudes of mind.", zh: "我们这一代最伟大的发现是：人类可以通过改变心态来改变生活。", key: "<b>by altering</b> 通过改变。", tip: "威廉·詹姆斯名言" },
-    { en: "In the middle of difficulty lies opportunity.", zh: "困难之中蕴藏着机遇。", key: "<b>lies</b> 蕴藏（倒装句）。", tip: "爱因斯坦名言" }
-  ]}
+  {
+    title: '短篇故事',
+    level: 'easy', levelText: '入门',
+    sentences: [
+      {
+        en: "Every morning, Emma walks to the park near her house. She loves the fresh air and the singing of birds. It's her favorite way to start the day.",
+        zh: "每天早上，艾玛走到家附近的公园。她喜欢新鲜空气和鸟儿的歌声。这是她开始一天最喜欢的方式。",
+        key: "<b>favorite way to start the day</b> 开始一天最喜欢的方式。<b>singing of birds</b> 鸟鸣（动名词作名词）。",
+        tip: "通读理解 → 跟读模仿 → 复述大意"
+      },
+      {
+        en: "The old man sat on the bench, watching children play. He smiled, remembering his own childhood. Those were the golden days, he thought.",
+        zh: "老人坐在长椅上，看着孩子们玩耍。他微笑着，回忆起自己的童年。他想，那才是黄金岁月。",
+        key: "<b>remembering</b> 现在分词作伴随状语；<b>golden days</b> 黄金岁月。",
+        tip: "注意 sat / watching / remembering / thought 的时态连贯"
+      }
+    ]
+  },
+  {
+    title: '新闻片段',
+    level: 'mid', levelText: '进阶',
+    sentences: [
+      {
+        en: "A recent study shows that people who read regularly tend to have better memory and sharper thinking skills as they age.",
+        zh: "最近一项研究表明，经常阅读的人随着年龄增长，往往有更好的记忆力和更敏锐的思维。",
+        key: "<b>tend to</b> 倾向于；<b>as they age</b> 随着年龄增长；<b>sharper</b> 更敏锐的。",
+        tip: "新闻句式较长，先抓主干：study shows that..."
+      },
+      {
+        en: "The company announced a new policy allowing employees to work remotely up to three days a week, starting next month.",
+        zh: "公司宣布了一项新政策，允许员工每周最多远程工作三天，下月起生效。",
+        key: "<b>allowing</b> 现在分词修饰 policy；<b>remotely</b> 远程地；<b>up to</b> 最多。",
+        tip: "长句拆分：主句 + 修饰语 + 时间状语"
+      }
+    ]
+  },
+  {
+    title: 'TED 演讲节选',
+    level: 'hard', levelText: '高级',
+    sentences: [
+      {
+        en: "Success is not final, failure is not fatal: it is the courage to continue that counts. We often learn more from our failures than from our victories.",
+        zh: "成功不是终点，失败也不是末日：重要的是继续前行的勇气。我们从失败中学到的往往比从胜利中学到的更多。",
+        key: "<b>not final</b> 不是终点；<b>not fatal</b> 不是致命的；<b>it is...that counts</b> 强调句型，「重要的是...」。",
+        tip: "丘吉尔名言变体，注意 it is...that... 强调结构"
+      },
+      {
+        en: "The greatest discovery of my generation is that human beings can alter their lives by altering their attitudes of mind.",
+        zh: "我们这一代最伟大的发现是：人类可以通过改变心态来改变生活。",
+        key: "<b>alter</b> 改变；<b>by altering</b> 通过改变（方式状语）；<b>attitudes of mind</b> 心态。",
+        tip: "威廉·詹姆斯名言，注意 alter 的双关重复"
+      },
+      {
+        en: "In the middle of difficulty lies opportunity. The pessimist sees difficulty in every opportunity, while the optimist sees opportunity in every difficulty.",
+        zh: "困难之中蕴藏着机遇。悲观者在每个机遇中看到困难，而乐观者却在每个困难中看到机遇。",
+        key: "<b>lies</b> 蕴藏/位于（倒装句）；<b>while</b> 而（表对比）；<b>pessimist/optimist</b> 悲观者/乐观者。",
+        tip: "爱因斯坦名言，注意 in...lies... 倒装结构和 while 的对比用法"
+      }
+    ]
+  }
 ];
 
+// ============ 工具 ============
 function escapeHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"').replace(/'/g, ''');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
+// ============ 初始化 ============
 function init() {
   const d = new Date();
   $('#todayDate').textContent = formatDate(d);
   initNav();
   switchPage('daily');
+  // 启动日志提醒定时检查
   startReminderChecker();
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminder(); });
+  // 页面可见时检查一次（从后台切回前台）
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkReminder();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

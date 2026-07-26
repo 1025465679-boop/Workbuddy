@@ -4,10 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>WorkBuddy 手机工作台</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260726c" />
 </head>
 <body>
   <div class="app">
+    <!-- 左侧边栏 -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="logo">WorkBuddy</div>
@@ -36,17 +37,27 @@
         </button>
       </nav>
     </aside>
+
+    <!-- 遮罩层 -->
     <div class="overlay" id="overlay"></div>
+
+    <!-- 主内容区 -->
     <main class="main">
       <header class="topbar">
         <button class="menu-btn" id="menuBtn">☰</button>
         <h1 class="page-title" id="pageTitle">每日计划</h1>
         <div class="date" id="todayDate"></div>
       </header>
-      <div class="content" id="content"></div>
+
+      <div class="content" id="content">
+        <!-- 页面内容由 JS 渲染 -->
+      </div>
     </main>
   </div>
+
+  <!-- 底部悬浮按钮（手机端专用） -->
   <button class="fab" id="fab" title="快速添加">+</button>
-  <script src="app.js"></script>
+
+  <script src="app.js?v=20260726c"></script>
 </body>
 </html>

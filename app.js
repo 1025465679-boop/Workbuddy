@@ -59,9 +59,9 @@ function speak(text, lang = 'en-US', rate = 0.9) {
 const PAGES = {
   daily:   { title: '每日计划',     render: renderDaily,   showFab: true  },
   log:     { title: '每日工作日志提醒', render: renderLog,     showFab: false },
-  travel:  { title: '旅游助手',     render: renderTravel,  showFab: true  },
   review:  { title: '每日/周复盘',  render: renderReview,  showFab: false },
   english: { title: '英语口语学习', render: renderEnglish, showFab: false },
+  account: { title: '记账本',       render: renderAccount, showFab: true  },
 };
 
 let currentPage = 'daily';
@@ -88,8 +88,8 @@ function initNav() {
     if (currentPage === 'daily') {
       const input = $('#taskInput');
       if (input) { input.focus(); }
-    } else if (currentPage === 'travel') {
-      const input = $('#travelInput');
+    } else if (currentPage === 'account') {
+      const input = $('#expenseAmount');
       if (input) { input.focus(); }
     }
   });
@@ -516,6 +516,51 @@ function showReminderModal(msg) {
   });
 }
 
+// 判断是否为节假日或周末（非工作日）
+// 包含 2025-2026 年国内法定节假日，周末默认不提醒
+function isHolidayOrWeekend() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const wd = now.getDay(); // 0=周日, 6=周六
+  const today = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+  // 周末默认不提醒
+  if (wd === 0 || wd === 6) {
+    // 但如果周末是法定调休上班日，则要提醒
+    if (!ADJUSTED_WORKDAYS.includes(today)) return true;
+  }
+
+  // 法定节假日不提醒
+  if (HOLIDAYS.includes(today)) return true;
+
+  return false;
+}
+
+// 2025-2026 国内法定节假日（日期）
+const HOLIDAYS = [
+  // 2025
+  '2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-01-31','2025-02-01','2025-02-02','2025-02-03','2025-02-04',
+  '2025-04-04','2025-04-05','2025-04-06',
+  '2025-05-01','2025-05-02','2025-05-03','2025-05-04','2025-05-05',
+  '2025-05-31','2025-06-01','2025-06-02',
+  '2025-10-01','2025-10-02','2025-10-03','2025-10-04','2025-10-05','2025-10-06','2025-10-07','2025-10-08',
+  // 2026
+  '2026-01-01','2026-02-15','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-02-21','2026-02-22','2026-02-23','2026-02-24',
+  '2026-04-04','2026-04-05','2026-04-06',
+  '2026-05-01','2026-05-02','2026-05-03','2026-05-04','2026-05-05',
+  '2026-06-19','2026-06-20','2026-06-21',
+  '2026-09-25','2026-09-26','2026-09-27',
+  '2026-10-01','2026-10-02','2026-10-03','2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-08',
+];
+
+// 法定调休上班日（周末但要上班）
+const ADJUSTED_WORKDAYS = [
+  '2025-01-26','2025-02-08','2025-04-27','2025-09-28','2025-10-11',
+  '2026-02-14','2026-02-28','2026-04-26','2026-09-27','2026-10-10',
+];
+
 // 定时检查提醒
 function startReminderChecker() {
   // 每 60 秒检查一次
@@ -530,6 +575,9 @@ function checkReminder() {
   const reminder = Store.get('log_reminder', { enabled: true, time: DEFAULT_REMINDER_TIME });
   if (!reminder.enabled) return;
 
+  // 节假日/周末判断
+  if (isHolidayOrWeekend()) return;
+
   const now = new Date();
   const hh = String(now.getHours()).padStart(2,'0');
   const mm = String(now.getMinutes()).padStart(2,'0');
@@ -541,96 +589,7 @@ function checkReminder() {
   }
 }
 
-// ============ 3. 旅游助手 ============
-function renderTravel() {
-  const plans = Store.get('travel', []).sort((a,b) => b.createdAt - a.createdAt);
-
-  $('#content').innerHTML = `
-    <div class="card">
-      <h3 class="card-title"><span class="emoji">✈️</span>添加旅行计划</h3>
-      <div class="travel-input-group">
-        <input type="text" id="travelInput" class="travel-input" placeholder="目的地，如：日本京都" />
-      </div>
-      <div class="travel-input-group">
-        <input type="date" id="travelDate" class="travel-input" />
-      </div>
-      <div class="travel-input-group">
-        <input type="text" id="travelNote" class="travel-input" placeholder="备注：必去景点/预算/天数等" />
-      </div>
-      <button class="log-save-btn" id="travelAddBtn">📌 添加计划</button>
-    </div>
-
-    <div class="card">
-      <h3 class="card-title"><span class="emoji">🗺️</span>我的旅行清单</h3>
-      ${plans.length === 0
-        ? '<div class="empty-tip"><span class="emoji">🌍</span>还没有旅行计划，添加一个吧！</div>'
-        : plans.map(p => `
-          <div class="travel-card">
-            <div class="travel-card-header">
-              <div class="travel-card-title">📍 ${escapeHtml(p.dest)}</div>
-              <div class="travel-card-date">${p.date || '未定日期'}</div>
-            </div>
-            <div class="travel-card-content">${escapeHtml(p.note || '暂无备注')}</div>
-            <div class="travel-card-actions">
-              <button onclick="toggleTravelDone('${p.id}')">${p.done ? '↩️ 取消完成' : '✅ 标记完成'}</button>
-              <button class="delete-btn" onclick="deleteTravel('${p.id}')">🗑 删除</button>
-            </div>
-          </div>
-        `).join('')
-      }
-    </div>
-
-    <div class="card">
-      <h3 class="card-title"><span class="emoji">💡</span>旅行小贴士</h3>
-      <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
-        • 提前 1 个月订机票酒店更便宜<br>
-        • 重要证件拍照存云端备用<br>
-        • 下载离线地图应对无网络<br>
-        • 兑换少量当地货币应急<br>
-        • 购买旅行保险更安心
-      </div>
-    </div>
-  `;
-
-  $('#travelAddBtn').addEventListener('click', addTravel);
-}
-
-function addTravel() {
-  const dest = $('#travelInput').value.trim();
-  if (!dest) { toast('请输入目的地'); return; }
-  const plans = Store.get('travel', []);
-  plans.push({
-    id: 'tr_' + Date.now(),
-    dest,
-    date: $('#travelDate').value,
-    note: $('#travelNote').value.trim(),
-    done: false,
-    createdAt: Date.now()
-  });
-  Store.set('travel', plans);
-  renderTravel();
-  toast('旅行计划已添加 🗺️');
-}
-
-function toggleTravelDone(id) {
-  const plans = Store.get('travel', []);
-  const p = plans.find(x => x.id === id);
-  if (p) {
-    p.done = !p.done;
-    Store.set('travel', plans);
-    renderTravel();
-  }
-}
-
-function deleteTravel(id) {
-  let plans = Store.get('travel', []);
-  plans = plans.filter(x => x.id !== id);
-  Store.set('travel', plans);
-  renderTravel();
-  toast('已删除');
-}
-
-// ============ 4. 每日/周复盘 ============
+// ============ 3. 每日/周复盘 ============
 let reviewMode = 'daily';
 
 function renderReview() {
@@ -1063,6 +1022,179 @@ const READING_LESSONS = [
     ]
   }
 ];
+
+// ============ 记账本 ============
+const EXPENSE_CATEGORIES = [
+  { value: 'food', label: '🍔 餐饮' },
+  { value: 'transport', label: '🚗 交通' },
+  { value: 'shopping', label: '🛍 购物' },
+  { value: 'life', label: '🏠 生活' },
+  { value: 'fun', label: '🎮 娱乐' },
+  { value: 'study', label: '📚 学习' },
+  { value: 'medical', label: '💊 医疗' },
+  { value: 'other', label: '📦 其他' },
+];
+
+let accountViewMode = 'month'; // month / year
+
+function renderAccount() {
+  const expenses = Store.get('expenses', []);
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const yy = `${now.getFullYear()}`;
+
+  const monthExpenses = expenses.filter(e => e.date.startsWith(ym));
+  const yearExpenses = expenses.filter(e => e.date.startsWith(yy));
+  const shownExpenses = accountViewMode === 'month' ? monthExpenses : yearExpenses;
+
+  const monthTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
+  const yearTotal = yearExpenses.reduce((s, e) => s + e.amount, 0);
+  const viewTotal = accountViewMode === 'month' ? monthTotal : yearTotal;
+
+  // 分类统计
+  const categoryTotals = {};
+  shownExpenses.forEach(e => {
+    categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
+  });
+
+  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+  const maxCategoryTotal = sortedCategories.length ? sortedCategories[0][1] : 1;
+
+  // 按日期倒序展示
+  const sortedExpenses = [...shownExpenses].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+  $('#content').innerHTML = `
+    <!-- 总览 -->
+    <div class="task-stats">
+      <div class="stat-box">
+        <div class="stat-num">¥${monthTotal.toFixed(2)}</div>
+        <div class="stat-label">本月支出</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">¥${yearTotal.toFixed(2)}</div>
+        <div class="stat-label">本年支出</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${shownExpenses.length}</div>
+        <div class="stat-label">${accountViewMode === 'month' ? '本月' : '本年'}笔数</div>
+      </div>
+    </div>
+
+    <!-- 记录消费 -->
+    <div class="card">
+      <h3 class="card-title"><span class="emoji">➕</span>记一笔</h3>
+      <div class="expense-form">
+        <div class="expense-row">
+          <input type="number" id="expenseAmount" class="expense-amount" placeholder="0.00" step="0.01" min="0" />
+          <span class="expense-unit">元</span>
+        </div>
+        <div class="expense-category-wrap" id="expenseCategoryWrap">
+          ${EXPENSE_CATEGORIES.map((c, i) => `
+            <button class="cat-btn ${i === 0 ? 'active' : ''}" data-cat="${c.value}">${c.label}</button>
+          `).join('')}
+        </div>
+        <input type="text" id="expenseNote" class="expense-note" placeholder="备注（可选）" />
+        <button class="log-save-btn" id="expenseAddBtn">💾 记一笔</button>
+      </div>
+    </div>
+
+    <!-- 视图切换 -->
+    <div class="review-tabs">
+      <button class="review-tab ${accountViewMode==='month'?'active':''}" onclick="switchAccountView('month')">📅 本月明细</button>
+      <button class="review-tab ${accountViewMode==='year'?'active':''}" onclick="switchAccountView('year')">📆 本年明细</button>
+    </div>
+
+    <!-- 分类统计 -->
+    ${sortedCategories.length === 0 ? '' : `
+      <div class="card">
+        <h3 class="card-title"><span class="emoji">📊</span>${accountViewMode === 'month' ? '本月' : '本年'}分类统计</h3>
+        ${sortedCategories.map(([cat, total]) => {
+          const catInfo = EXPENSE_CATEGORIES.find(c => c.value === cat) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+          const pct = Math.round(total / maxCategoryTotal * 100);
+          return `
+            <div class="cat-stat">
+              <div class="cat-stat-header">
+                <span class="cat-stat-label">${catInfo.label}</span>
+                <span class="cat-stat-amount">¥${total.toFixed(2)}</span>
+              </div>
+              <div class="cat-stat-bar"><div class="cat-stat-fill" style="width:${pct}%"></div></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `}
+
+    <!-- 明细列表 -->
+    <div class="card">
+      <h3 class="card-title"><span class="emoji">📒</span>${accountViewMode === 'month' ? '本月' : '本年'}明细 (${shownExpenses.length})</h3>
+      ${sortedExpenses.length === 0
+        ? '<div class="empty-tip"><span class="emoji">💰</span>还没有记录，开始记一笔吧！</div>'
+        : sortedExpenses.map(e => {
+            const catInfo = EXPENSE_CATEGORIES.find(c => c.value === e.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+            return `
+              <div class="expense-item">
+                <div class="expense-item-cat">${catInfo.label}</div>
+                <div class="expense-item-info">
+                  <div class="expense-item-amount">¥${e.amount.toFixed(2)}</div>
+                  <div class="expense-item-meta">${e.date}${e.note ? ' · ' + escapeHtml(e.note) : ''}</div>
+                </div>
+                <button class="task-delete" onclick="deleteExpense('${e.id}')">✕</button>
+              </div>
+            `;
+          }).join('')
+      }
+    </div>
+  `;
+
+  // 分类选择
+  $$('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // 添加消费
+  $('#expenseAddBtn').addEventListener('click', addExpense);
+  $('#expenseAmount').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+  $('#expenseNote').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+}
+
+function switchAccountView(mode) {
+  accountViewMode = mode;
+  renderAccount();
+}
+
+let currentExpenseCategory = 'food';
+
+function addExpense() {
+  const amount = parseFloat($('#expenseAmount').value);
+  if (!amount || amount <= 0) { toast('请输入金额'); return; }
+  const activeCat = $('.cat-btn.active');
+  const category = activeCat ? activeCat.dataset.cat : 'other';
+  const note = $('#expenseNote').value.trim();
+
+  const expenses = Store.get('expenses', []);
+  expenses.push({
+    id: 'e_' + Date.now(),
+    amount,
+    category,
+    note,
+    date: todayStr(),
+    createdAt: Date.now()
+  });
+  Store.set('expenses', expenses);
+  renderAccount();
+  toast('已记录 ¥' + amount.toFixed(2) + ' 💰');
+}
+
+function deleteExpense(id) {
+  let expenses = Store.get('expenses', []);
+  expenses = expenses.filter(x => x.id !== id);
+  Store.set('expenses', expenses);
+  renderAccount();
+  toast('已删除');
+}
 
 // ============ 工具 ============
 function escapeHtml(str) {

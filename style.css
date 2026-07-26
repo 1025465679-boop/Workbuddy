@@ -855,3 +855,98 @@ html, body {
 /* 滚动条美化 */
 .content::-webkit-scrollbar { width: 4px; }
 .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ============ 记账本 ============ */
+.expense-form { display: flex; flex-direction: column; gap: 12px; }
+.expense-row { display: flex; align-items: center; gap: 8px; }
+.expense-amount {
+  flex: 1;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 24px;
+  font-weight: 700;
+  outline: none;
+  background: var(--bg);
+  text-align: right;
+}
+.expense-amount:focus { border-color: var(--primary); background: #fff; }
+.expense-unit { font-size: 16px; color: var(--text-secondary); font-weight: 600; }
+
+.expense-category-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cat-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cat-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.expense-note {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg);
+}
+.expense-note:focus { border-color: var(--primary); background: #fff; }
+
+.cat-stat { margin-bottom: 12px; }
+.cat-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.cat-stat-label { font-size: 13px; font-weight: 500; }
+.cat-stat-amount { font-size: 13px; font-weight: 700; color: var(--primary); }
+.cat-stat-bar {
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cat-stat-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #818cf8);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.expense-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.expense-item-cat {
+  font-size: 18px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.expense-item-info { flex: 1; min-width: 0; }
+.expense-item-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--danger);
+}
+.expense-item-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

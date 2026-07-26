@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>WorkBuddy 手机工作台</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">WorkBuddy</div>
+        <div class="subtitle">个人工作台</div>
+      </div>
+      <nav class="nav" id="nav">
+        <button class="nav-item active" data-page="daily">
+          <span class="icon">📋</span>
+          <span class="label">每日计划</span>
+        </button>
+        <button class="nav-item" data-page="log">
+          <span class="icon">🔔</span>
+          <span class="label">每日工作日志提醒</span>
+        </button>
+        <button class="nav-item" data-page="travel">
+          <span class="icon">✈️</span>
+          <span class="label">旅游助手</span>
+        </button>
+        <button class="nav-item" data-page="review">
+          <span class="icon">🔄</span>
+          <span class="label">每日/周复盘</span>
+        </button>
+        <button class="nav-item" data-page="english">
+          <span class="icon">🎧</span>
+          <span class="label">英语口语学习</span>
+        </button>
+      </nav>
+    </aside>
+    <div class="overlay" id="overlay"></div>
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <h1 class="page-title" id="pageTitle">每日计划</h1>
+        <div class="date" id="todayDate"></div>
+      </header>
+      <div class="content" id="content"></div>
+    </main>
+  </div>
+  <button class="fab" id="fab" title="快速添加">+</button>
+  <script src="app.js"></script>
+</body>
+</html>
